@@ -58,7 +58,7 @@ stat.window <- function(x,window,necess,FUN=mean) {
   return(xmean)
 }
 
-mean.window <- function(x,k,necess) {
+mean_window <- function(x,k,necess) {
   xmean <- runmean(x,k=k,alg="C",endrule="NA",align="right")
   xvalid <- runmean(!is.na(x),k=k,alg="C",endrule="NA",align="right")*k
   xmean[xvalid < necess] <- NA
@@ -80,15 +80,18 @@ detect.event <- function(x,threshold) {
   id.event <- cumsum(event.start)*over
   n.events <- max(id.event)
   if(n.events>0) {
-    event.duration <- NULL
-    event.max <- NULL
+    event.duration  <- NULL
+    event.max       <- NULL
+    index.event.max <- NULL
     for(i in 1:n.events) {
-      event.duration <- c(event.duration, sum(i==id.event))
-      event.max <- c(event.max, max(x[i==id.event]))
+      event.duration  <- c(event.duration, sum(i==id.event))
+      event.max       <- c(event.max,      max(x[i==id.event]))
+      index.event.max <- c(index.event.max,index.event.start[i] + which.max(x[i==id.event]) - 1)
     }
-    out <- data.frame(index=index.event.start,
-                      duration=event.duration,
-                      max=event.max)
+    out <- data.frame(index    = index.event.start,
+                      duration = event.duration,
+                      max      = event.max,
+                      index.max= index.event.max)
   } else {
     out <- NULL
   }
@@ -103,8 +106,9 @@ aot <- function(x, hr, threshold=80, estimate=T, hr.min=8, hr.max=19) {
   delta.positive <- pmax(x[in.hr]-threshold,0)
   Aot <- sum(delta.positive, na.rm=T)
   if(estimate) Aot <- Aot*sum(in.hr)/sum(in.hr.valid)
-  PercValid <- sum(in.hr.valid)/sum(in.hr)*100
-  out <- list(Aot=Aot, PercValid=PercValid)
+  NhValid <- sum(in.hr.valid)
+  PercValid <- NhValid/sum(in.hr)*100
+  out <- list(Aot=Aot, PercValid=PercValid, NhValid=NhValid)
   return(out)
 }
 

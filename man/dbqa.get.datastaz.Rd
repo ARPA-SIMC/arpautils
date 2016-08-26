@@ -10,7 +10,10 @@ Estrae i dati di una stazione per un dato parametro (inquinante)
 Estrae i dati di una stazione per un dato parametro (inquinante)
 }
 \usage{
-dbqa.get.datastaz(con, ts.range, id.staz, id.param, flg = 1, tstep, ...)
+dbqa.get.datastaz(con, ts.range, id.staz, id.param,
+                  flg=1, tstep, 
+                  lod.manage=ifelse({id.param \%in\% c(12,14,15,18,29)},
+                  "half", "keep"),...)
 }
 %- maybe also 'usage' for other objects documented here.
 \arguments{
@@ -30,7 +33,18 @@ codice numerico dell'inquinante
 valore (o valori) accettati per la flag di qualita'
 }
   \item{tstep}{
-stringa di carattere che identifica il timestep ("H" o "d", orario o giornaliero)
+stringa di carattere che identifica il timestep:
+\itemize{
+  \item "H" orario
+  \item "d" giornaliero
+}
+}
+  \item{lod.manage}{
+stringa di carattere che specifica come devono essere gestiti i valori inferiori al Limit Of Detection:
+\itemize{
+  \item "half" sostituisce con LOD/2 (è il default per benzoapirene e alcuni metalli)
+  \item "keep" tiene il valore osservato (è il default per gli altri parametri)
+}
 }
   \item{\dots}{
 %%     ~~Describe \code{\dots} here~~
@@ -47,19 +61,13 @@ argomenti opzionali, passati a \code{dbqa.get.datasens}
 %%  \item{comp2 }{Description of 'comp2'}
 %% ...
 }
-\references{
-%% ~put references to the literature/web site here ~
-}
 \author{
 %%  ~~who you are~~
 Giovanni Bonafè, Arpa Emilia-Romagna
-}
-\note{
-%%  ~~further notes~~
 }
 
 %% ~Make other sections like Warning with \section{Warning }{....} ~
 
 \seealso{
-%% ~~objects to See Also as \code{\link{help}}, ~~~
+\code{\link{dbqa.get.datasens}}, \code{\link{dbqa.lod}}
 }

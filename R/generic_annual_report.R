@@ -86,7 +86,7 @@ calculate.annual_report <- function(data,
       annual.percValid <- annual.nValid/ndays*100
       annual.nExpected <- ndays-4 
     }
-    annual.efficiency <- round.awayfromzero(annual.nValid/annual.nExpected*100)
+    annual.efficiency <- round_awayfromzero(annual.nValid/annual.nExpected*100)
     
     annual.report <- data.frame(annual.mean      =annual.mean,
                                 annual.nValid    =annual.nValid,
@@ -110,7 +110,7 @@ calculate.annual_report <- function(data,
       critmonths.percValid <- critmonths.nValid/length(cmDat)*100
       if(hourly) critmonths.nExpected <- length(cmDat)/24*23
       if(daily)  critmonths.nExpected <- length(cmDat)-(length(critical.months)%/%3) # esige un dato in meno a trimestre
-      critmonths.efficiency <- round.awayfromzero(critmonths.nValid/critmonths.nExpected*100)
+      critmonths.efficiency <- round_awayfromzero(critmonths.nValid/critmonths.nExpected*100)
       
       annual.report <- data.frame(annual.report,
                                   critmonths.mean      =critmonths.mean,
@@ -152,20 +152,23 @@ calculate.annual_report <- function(data,
   ## calcola superamenti giornalieri del max della media 8h
   if(!is.null(thr.ave8h.max)){
     if(!is.null(Dat)){
-      if(hourly) ave.8h <- mean.window(x=as.vector(Dat),k=8,necess=6)
+      if(hourly) ave.8h <- mean_window(x=as.vector(Dat),k=8,necess=6)
       if(daily)  stop("cannot calculate 8h moving average for daily data!")
       max.ave.8h <- stat.period(x=ave.8h,period=day,necess=18,FUN=max)[-1]
       ave8h.nexc      <- sum(as.numeric(dbqa.round(max.ave.8h,id.param)>thr.ave8h.max), na.rm=T)
+      ave8h.yave      <- dbqa.round(mean(max.ave.8h, na.rm=T), id.param)
       ave8h.nValid    <- sum(as.numeric(!is.na(max.ave.8h)))
       ave8h.percValid <- ave8h.nValid/ndays*100
       
       annual.report <- data.frame(annual.report,
                                   ave8h.nexc     =ave8h.nexc,
+                                  ave8h.yave     =ave8h.yave,
                                   ave8h.nValid   =ave8h.nValid,
                                   ave8h.percValid=ave8h.percValid)
     }else{
       annual.report <- data.frame(annual.report,
                                   ave8h.nexc     =NA,
+                                  ave8h.yave     =NA,
                                   ave8h.nValid   =NA,
                                   ave8h.percValid=NA)
     }
@@ -190,7 +193,8 @@ calculate.annual_report <- function(data,
   ## conta superamenti orari
   if(!is.null(thr.hourly)){
     if(!is.null(yDat) & hourly){
-      hourly.nexc <- sum(as.numeric(yDat>thr.hourly), na.rm=T)
+      hourly.nexc <- sum(as.numeric(dbqa.round(yDat,id.param = id.param)>thr.hourly),
+                         na.rm=T)
       
       annual.report <- data.frame(annual.report,
                                   hourly.nexc=hourly.nexc)
@@ -203,7 +207,8 @@ calculate.annual_report <- function(data,
   ## conta superamenti orari per piu' di NH ore consecutive
   if(!is.null(thr.multihourly)){
     if(!is.null(yDat) & hourly){
-      multihourly.exc <- detect.event(yDat,thr.multihourly)$duration > NH
+      multihourly.exc <- detect.event(dbqa.round(yDat,id.param = id.param),
+                                      thr.multihourly)$duration > NH
       multihourly.nexc <- sum(as.numeric(multihourly.exc), na.rm=T)
       
       annual.report <- data.frame(annual.report,
@@ -243,6 +248,8 @@ write.annual_report <- function(con,
                             paste("select COD_PRV from AA_ARIA.T$01$CONFIG_STAZIONI",
                                   "where ID_CONFIG_STAZ=",AR$id.staz)))
   
+  ## gestisce LOD
+  lod <- dbqa.lod(con = con, id.param = id.param, days = AR$last.time)
   ## inserisce media annua
   id.elab=30
   flg.elab=as.numeric(!is.null(AR$annual.report$annual.efficiency) &&
@@ -259,6 +266,13 @@ write.annual_report <- function(con,
                                 TS2_V1_ELAB    =date4db(AR$last.time),
                                 TS_INS         =date4db(Sys.time()),
                                 FLG_ELAB       =flg.elab,
+                                N_DATI         =AR$annual.report$annual.nValid,
+                                V_ELAB_C       =ifelse(test = AR$annual.report$annual.mean < lod,
+                                                       yes  = as.character(lod),
+                                                       no   = ""),
+                                SEGNO          =ifelse(test = AR$annual.report$annual.mean < lod,
+                                                       yes  = "<",
+                                                       no   = ""),
                                 row.names = NULL),
               to_date=c(1,8,9,10),
               verbose=verbose,
@@ -282,6 +296,7 @@ write.annual_report <- function(con,
                                   TS2_V1_ELAB    =date4db(AR$last.time),
                                   TS_INS         =date4db(Sys.time()),
                                   FLG_ELAB       =flg.elab,
+                                  N_DATI         =AR$annual.report$daily.nValid,
                                   row.names = NULL),
                 to_date=c(1,8,9,10),
                 verbose=verbose,
@@ -306,6 +321,7 @@ write.annual_report <- function(con,
                                   TS2_V1_ELAB    =date4db(AR$last.time),
                                   TS_INS         =date4db(Sys.time()),
                                   FLG_ELAB       =flg.elab,
+                                  N_DATI         =AR$annual.report$hourly.nValid,
                                   row.names = NULL),
                 to_date=c(1,8,9,10),
                 verbose=verbose,
@@ -329,6 +345,31 @@ write.annual_report <- function(con,
                                   TS2_V1_ELAB    =date4db(AR$last.time),
                                   TS_INS         =date4db(Sys.time()),
                                   FLG_ELAB       =flg.elab,
+                                  N_DATI         =AR$annual.report$ave8h.nValid,
+                                  row.names = NULL),
+                to_date=c(1,8,9,10),
+                verbose=verbose,
+                ...)
+  }
+  
+  ## inserisce media annua del max giorn.media 8h (CO)
+  if(id.param %in% c(10) & ("ave8h.yave" %in% colnames(AR$annual.report))) { 
+    if(id.param==10) id.elab=821
+    flg.elab=as.numeric(!is.null(AR$annual.report$annual.efficiency) &&
+                          AR$annual.report$annual.efficiency>=90)
+    dbqa.insert(con=con, tab="WEB_STAT",
+                values=data.frame(GIORNO         =date4db(AR$first.time),
+                                  ID_CONFIG_STAZ =AR$id.staz,
+                                  COD_PRV        =prov,
+                                  ID_PARAMETRO   =id.param,
+                                  ID_ELABORAZIONE=id.elab,
+                                  ID_EVENTO      =0,
+                                  V_ELAB_F       =AR$annual.report$ave8h.yave,
+                                  TS1_V1_ELAB    =date4db(AR$first.time),
+                                  TS2_V1_ELAB    =date4db(AR$last.time),
+                                  TS_INS         =date4db(Sys.time()),
+                                  FLG_ELAB       =flg.elab,
+                                  N_DATI         =AR$annual.report$ave8h.nValid,
                                   row.names = NULL),
                 to_date=c(1,8,9,10),
                 verbose=verbose,
